@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
+import { jwtDecode } from "jwt-decode";
+
+interface User {
+  id: string;
+  email: string;
+  verified_email: boolean;
+  name: string;
+  given_name: string;
+  family_name: string;
+  picture: string;
+}
 
 export const App = () => {
-  const [user, setUser] = useState({
-    name: "",
-    email: "",
-    picture: "",
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [privateData, setPrivateData] = useState<string | null>(null);
 
   const handleGoogleLogin = () => {
     const googleLoginUrl = getGoogleLoginUrl();
@@ -26,7 +34,7 @@ export const App = () => {
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    const urlAccessToken = url.searchParams.get("access_token");
+    const urlAccessToken = url.searchParams.get("token");
 
     if (urlAccessToken) {
       localStorage.setItem("accessToken", urlAccessToken);
@@ -38,12 +46,8 @@ export const App = () => {
     const fetchUserProfile = async () => {
       if (accessToken) {
         try {
-          const profile = await fetchUserProfileData(accessToken);
-          setUser({
-            name: profile.name,
-            email: profile.email,
-            picture: profile.picture,
-          });
+          const userProfile = await jwtDecode(accessToken);
+          setUser(userProfile as User);
         } catch (error) {
           console.error("Error fetching user profile:", error);
         }
@@ -53,25 +57,33 @@ export const App = () => {
     fetchUserProfile();
   }, []);
 
-  const fetchUserProfileData = async (accessToken: string) => {
-    const profileResponse = await fetch(
-      "https://www.googleapis.com/oauth2/v3/userinfo",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+  const fetchPrivateData = async () => {
+    const accessToken = localStorage.getItem("accessToken");
+    if (accessToken) {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/private`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+        const data = await response.json();
+        setPrivateData(data);
+      } catch (error) {
+        console.error("Error fetching private data:", error);
       }
-    );
-    if (!profileResponse.ok) {
-      throw new Error("Failed to fetch user profile");
     }
-    return await profileResponse.json();
   };
 
   return (
     <div>
       <button onClick={handleGoogleLogin}>Google Login</button>
       <pre>{JSON.stringify(user, null, 2)}</pre>
+      <button onClick={fetchPrivateData}>Fetch Private Data</button>
+      <pre>{JSON.stringify(privateData, null, 2)}</pre>
     </div>
   );
 };

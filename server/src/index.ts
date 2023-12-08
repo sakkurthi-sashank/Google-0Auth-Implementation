@@ -1,48 +1,38 @@
 import express from "express";
-import axios from "axios";
 import dotenv from "dotenv";
-
+import cors from "cors";
 dotenv.config();
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = "http://localhost:8080/api/auth/callback/google";
+import { oauthRouter } from "./login/oauth";
+import { oauthMiddleware } from "./middleware/oauth-middleware";
 
 const app = express();
 
-app.get("/server-status", (req, res) => {
+app.use(cors());
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.get("/", (req, res) => {
   res.send({
     message: "Server is running",
   });
 });
 
-app.get("/api/auth/callback/google", (req, res) => {
-  const { code } = req.query;
+app.get("/public", (req, res) => {
+  res.send({
+    message: "This is a public route",
+  });
+});
 
-  console.log(code);
+app.use(oauthRouter);
 
-  axios
-    .post("https://oauth2.googleapis.com/token", null, {
-      params: {
-        code,
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        redirect_uri: REDIRECT_URI,
-        grant_type: "authorization_code",
-        scope:
-          "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
-      },
-    })
-    .then((response) => {
-      console.log(response.data);
-      res.redirect(
-        `http://localhost:5173/?access_token=${response.data.access_token}&refresh_token=${response.data.refresh_token}`
-      );
-    })
-    .catch((error) => {
-      console.log(error);
-      res.status(500).send("Error handling OAuth callback");
-    });
+app.use(oauthMiddleware);
+
+app.get("/private", (req, res) => {
+  res.send({
+    message: "This is a private route",
+  });
 });
 
 const PORT = process.env.PORT || 8080;
